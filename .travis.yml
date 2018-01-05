@@ -1,16 +1,34 @@
----
 sudo: required
 services: docker
 env:
-  - DOCKER_COMPOSE_VERSION=1.16.1
+  APP_NAME: basic-ui
 before_install:
-  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-  - sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-  - sudo apt-get update
-  - sudo apt-get -y install docker-ce
-  - sudo rm /usr/local/bin/docker-compose
-  - curl -L https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
-  - chmod +x docker-compose
-  - sudo mv docker-compose /usr/local/bin
+  - docker run -tdi --name tizenstudio --init -v ${PWD}:/home/developer/workspace dhsshine/tizen-studio:2.1
 script:
-  - docker --version
+  - docker exec -it tizenstudio package-manager-cli.bin install MOBILE-4.0
+  - docker exec -it tizenstudio package-manager-cli.bin show-pkgs
+  - docker exec -it tizenstudio bash -c 'cd workspace && tizen build-native -a arm -c gcc -C Debug'
+  - docker exec -it tizenstudio bash -c 'cd workspace/Debug && tizen package -t tpk'
+after_success:
+  - export ARTIFACT_ID="$APP_NAME-$(date +'%Y%m%d%H%M%S')-$(git log --format=%h -1)"
+before_deploy:
+  - git config --local user.name "Donghoon Shin"
+  - git config --local user.email "dhs.shine@gmail.com"
+  - git tag -f $ARTIFACT_ID
+deploy:
+  - provider: s3
+    region: ap-northeast-2
+    access_key_id:
+      secure: t8mg14pjbdH9ar+2IUATuS1FbjY/02W7uJ9jFLC5bTHW0EDtyeydfAYWYd8fbOGI2mF7UpzfN9Lz2yleY6+neIzkvKh0/6WvwZDCju4jkWUqSvnh+mXeCiQlET/4VZG1E7e1+5PRMKN1/Ng9WvkNI6RDlmlHhlkX3ZOKgAfh+pN+hy0F0xbFLJo/q6PN+zr/M+OrQeP8oOcEFmLeVMN7DdhwwZ5B/8ogdgNA9N6Ap2Jd90cnhscILMm1IeaTBROIDHojqoG3Lk4uZnpv5p8C3nlmGwVg0kPAhSvdN+WkgVoglHXtzRx7OPz61tRTJQS8cU7HvWZfKUrHOTiYBkDBb0zjSHbzJVKBZynbJh+to7J5ArKB8UX9JfYWgbufg/KdU0YQdbgClSMhM2Hc5gRUb2dxyneAewX1um6GlhHJS47fnc+xWcKxdDQVQgz87XL+gapoJDuMZX8DKWAAxxj8P4OB/K3ZEjZSP57hiwAY+aDDFU1fKvy38X93rBgnZcJUpAN88Bm1W/44toX6dluT0O6MpklD4+slmQOYx8QYIxet4LHaYCW8vvhe2DZot6EB4rKtIZdW3b1r5jyE+0itEhmKRSYZhatSS8kQGt6zBUmlFOODIlHf/gzE+gfCO7RrfJZSU0/g1VdL9sQngnRAU4GiCKrPE2Ff799EXH+Py7U=
+    secret_access_key:
+      secure: mkl7D419t5MJLPueY6TTSEZbzITDa8+fZXtmmEgneYVgILXUBStPVWpiHIuLJMauhAb3N+1tDnVT64UczWmBUEjhvRDQQbRxjC9cI1VWCpKfKKoz4NYB3C/Gt95E6pswtMx3cPplm0mDBsKXpBwhtoQlPluQKecVOUd1hK5rJHQAG2tcyFGoN58fX3Oi4aAd6phKhezhmuVAim+5jDDX1M9uVJupFrlOnfPrKmNjTa/e8Chn1mvMFzlk6bOqXGRlBBDMbfUHNfQY1vl7i6I8+PBJ1imXlkHNG0SmnH+zQJxfH/kheBNaEWeA4I0TpwcXOZS/b0JY8Ie/UNcQLmbWfHq5ovWqKNo5M5J63bSmbetuento4fVuKhoOdD6lSGlcXaedqZNEOOCpG0vndELZf4T+ZgTtAxVnL7I31WppQ9f15lvl1UpGnW3tdsj5UMUeyArLPF+vYs4mfaIi8vSLRW96hGUIliK7btEmugm+uu0H7fzeyrXoh5gQLFZnO/0/nl3EDc9iOKlYikPb6Y5sUSch1UpB+LcGZB995S44E0b6KUXBhr152gagBW6BqX06zAZOucPJ/08lJ+8n+x6x1tLy8XgSHvZwhjmESCsy90Q+KAFTA0T7HXCvp2WHKHfAjse5iYcDakNrcj0/g/DGTo5+I7L9oPPo1ISTI63gR4o=
+    bucket: mde-update-bucket
+    local_dir: Debug
+    skip_cleanup: true
+    upload-dir: $ARTIFACT_ID
+  - provider: releases
+    api_key:
+      secure: htrssRYNAsT420A7IrxWe591EhwfS+Dv8cB1IqeI9kheKzF5p+FVAXD2/EeeK4/Gnb1FqB/QoxmcxyMmpkD6wCaylcN+iRASElMGutshyyi6AvO+et/k63EO8GcwVOIJtcgQp4L+LVNDY0tsrV2mLZonHOzg6EvygdvlH2tHIU05AGFSoMrCY/leTZY/9BOM6ypyy7OYKdJY5VTO4af8EwrUk3EnWMglLFGJLlGaPOZpJ5zlbYyhfSAjt+L1o966lX7yT/QqIc7lyMjMk/+B3XKpmsKZDU7qPZjVUVlKCPMH8h+QQBDPwK0Y5FzxPt0XEzEAe1jKg2kjjMfBBoUnSVRKqD4Ni2nPHbLnq/CPY5hE4JEAMXraL3pAG/HsRy6jOSw4u+CeJDFs3xSnvleWE/Id14/0gqwExdlHi5g6B7acz6dJ+WfzrHMswW4Vn5zZVnoiK2grXGaMsbPCZJIFuwn4JU9y9ytLq6RVh0LmFrZM1lahC8pGP/QajshLs4Cu7h193IPgNTF1a71zV5P0CErsntVzd+nrE9BTXMwcq4edcoF+mPU0wlg23ReVhS9jPP5FhfwEhNpAocuCOBwA2xnhxISDshRSSWSKfeYFwG5poDbmpCVjfe9RMD9nrnP5IO8FFO0NybTFX0xOXkOl5czgTUoGFt/E7dLsJ2hb+vY=
+    skip_cleanup: true
+    file: Debug/*.tpk
+    file_glob: true
