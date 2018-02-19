@@ -1,4 +1,5 @@
 pipeline {
+
     agent {
         node {
             label 'mde'
@@ -13,4 +14,5 @@ pipeline {
             }
         }
     }
+
 }
