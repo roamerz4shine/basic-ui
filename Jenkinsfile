@@ -1,11 +1,9 @@
 pipeline {
-
     agent {
         node {
             label 'mde'
         } 
     }
-
     stages {
         stage('Build') { 
             steps {
